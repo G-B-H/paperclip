@@ -155,6 +155,7 @@ export function OrgChart() {
     queryKey: queryKeys.agents.list(selectedCompanyId!),
     queryFn: () => agentsApi.list(selectedCompanyId!),
     enabled: !!selectedCompanyId,
+    refetchInterval: 5000,
   });
 
   const agentMap = useMemo(() => {
@@ -412,7 +413,7 @@ export function OrgChart() {
                     <AgentIcon icon={agent?.icon} className="h-4.5 w-4.5 text-foreground/70" />
                   </div>
                   <span
-                    className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card"
+                    className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card${node.status === "running" ? " animate-pulse" : ""}`}
                     style={{ backgroundColor: dotColor }}
                   />
                 </div>
