@@ -281,7 +281,7 @@ async function runPnpm(args, options = {}) {
 
 async function getMigrationStatusPayload() {
   const status = await runPnpm(
-    ["--filter", "@paperclipai/db", "exec", "tsx", "src/migration-status.ts", "--json"],
+    ["--filter", "@paperclipai/db", "exec", "bun", "src/migration-status.ts", "--json"],
     { env },
   );
   if (status.code !== 0) {

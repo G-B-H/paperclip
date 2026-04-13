@@ -32,15 +32,15 @@
     "skills"
   ],
   "scripts": {
-    "preflight:workspace-links": "tsx ../scripts/ensure-workspace-package-links.ts",
-    "dev": "pnpm run preflight:workspace-links && tsx src/index.ts",
-    "dev:watch": "pnpm run preflight:workspace-links && cross-env PAPERCLIP_MIGRATION_PROMPT=never PAPERCLIP_MIGRATION_AUTO_APPLY=true tsx ./scripts/dev-watch.ts",
+    "preflight:workspace-links": "bun ../scripts/ensure-workspace-package-links.ts",
+    "dev": "pnpm run preflight:workspace-links && bun src/index.ts",
+    "dev:watch": "pnpm run preflight:workspace-links && cross-env PAPERCLIP_MIGRATION_PROMPT=never PAPERCLIP_MIGRATION_AUTO_APPLY=true bun ./scripts/dev-watch.ts",
     "prepare:ui-dist": "bash ../scripts/prepare-server-ui-dist.sh",
     "build": "pnpm run preflight:workspace-links && tsc && mkdir -p dist/onboarding-assets && cp -R src/onboarding-assets/. dist/onboarding-assets/",
     "prepack": "pnpm run prepare:ui-dist",
     "postpack": "rm -rf ui-dist",
     "clean": "rm -rf dist",
-    "start": "node dist/index.js",
+    "start": "bun src/index.ts",
     "typecheck": "pnpm run preflight:workspace-links && pnpm --filter @paperclipai/plugin-sdk build && tsc --noEmit"
   },
   "dependencies": {
@@ -88,7 +88,6 @@
     "@types/ws": "^8.18.1",
     "cross-env": "^10.1.0",
     "supertest": "^7.0.0",
-    "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vite": "^6.1.0",
     "vitest": "^3.0.5"
