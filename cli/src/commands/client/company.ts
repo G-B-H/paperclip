@@ -400,6 +400,51 @@ function buildDefaultImportAdapterMessages(
   ];
 }
 
+async function promptForImportAdapterOverrides(
+  preview: Pick<CompanyPortabilityPreviewResult, "manifest" | "selectedAgentSlugs">,
+  { interactive, json }: { interactive: boolean; json: boolean },
+): Promise<Record<string, { adapterType: string }> | undefined> {
+  const selectedAgentSlugs = new Set(preview.selectedAgentSlugs);
+  const processAgents = preview.manifest.agents
+    .filter((agent) => selectedAgentSlugs.size === 0 || selectedAgentSlugs.has(agent.slug))
+    .filter((agent) => agent.adapterType === "process");
+
+  if (processAgents.length === 0) return undefined;
+
+  let adapterType = "claude_local";
+
+  if (interactive && !json) {
+    const agentList = processAgents
+      .map((a) => a.name ?? a.slug)
+      .slice(0, 3)
+      .join(", ");
+    const suffix = processAgents.length > 3 ? `, +${processAgents.length - 3} more` : "";
+
+    const choice = await p.select<string>({
+      message: `Select adapter for ${processAgents.length} imported ${pluralize(processAgents.length, "agent")} (${agentList}${suffix})`,
+      options: [
+        { value: "claude_local", label: "claude-local", hint: "Claude Code — default" },
+        { value: "codex_local", label: "codex-local", hint: "OpenAI Codex CLI" },
+        { value: "gemini_local", label: "gemini-local", hint: "Google Gemini CLI" },
+        { value: "opencode_local", label: "opencode-local", hint: "OpenCode" },
+        { value: "cursor", label: "cursor", hint: "Cursor" },
+        { value: "http", label: "http", hint: "HTTP endpoint" },
+        { value: "process", label: "process", hint: "keep original adapter type" },
+      ],
+      initialValue: "claude_local",
+    });
+    if (p.isCancel(choice)) return buildDefaultImportAdapterOverrides(preview);
+    adapterType = choice as string;
+  }
+
+  if (adapterType === "process") return undefined;
+
+  const overrides = Object.fromEntries(
+    processAgents.map((agent) => [agent.slug, { adapterType }]),
+  );
+  return Object.keys(overrides).length > 0 ? overrides : undefined;
+}
+
 async function promptForImportSelection(preview: CompanyPortabilityPreviewResult): Promise<string[]> {
   const catalog = buildImportSelectionCatalog(preview);
   const state = buildDefaultImportSelectionState(catalog);
@@ -1381,7 +1426,10 @@ export function registerCompanyCommands(program: Command): void {
           if (!preview) {
             throw new Error("Import preview returned no data.");
           }
-          const adapterOverrides = buildDefaultImportAdapterOverrides(preview);
+          const adapterOverrides = await promptForImportAdapterOverrides(preview, {
+            interactive: interactiveView,
+            json: ctx.json,
+          });
           const adapterMessages = buildDefaultImportAdapterMessages(adapterOverrides);
 
           if (opts.dryRun) {
