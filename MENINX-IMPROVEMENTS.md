@@ -6,25 +6,25 @@ This document outlines prioritized improvements for the G-B-H/paperclip fork, sp
 
 The migration to Bun is a key performance win for MENINX. However, some remnants of the previous Node.js/tsx runtime persist.
 
-- [ ] **Migrate remaining `package.json` scripts:** Several scripts still invoke `node` or `tsx` directly (e.g., `check:tokens`, `prebuild` in examples, `prepack` in UI). These should be switched to `bun`.
-- [ ] **Fix outdated error messages:** `scripts/dev-runner.ts` and `scripts/dev-runner.mjs` have been updated to use `bun`, but their error messages still reference `tsx` (e.g., line 352 in `.ts`).
-- [ ] **Optimize `RunChildProcess`:** Investigate using `Bun.spawn` for even better performance in local adapters, while maintaining a compatibility layer for non-Bun environments if necessary.
+- [x] **Migrate remaining `package.json` scripts:** Several scripts still invoke `node` or `tsx` directly (e.g., `check:tokens`, `prebuild` in examples, `prepack` in UI). These should be switched to `bun`.
+- [x] **Fix outdated error messages:** `scripts/dev-runner.ts` and `scripts/dev-runner.mjs` have been updated to use `bun`, but their error messages still reference `tsx` (e.g., line 352 in `.ts`).
+- [ ] **Optimize `RunChildProcess`:** Investigated `Bun.spawn` as an alternative. Deferred — `Bun.spawn` returns `Bun.Subprocess` (stream-based), not a `ChildProcess` (event-emitter-based). Requires a full rewrite of the event handler layer and `runningProcesses` map. Risk outweighs the gain at current scale.
 
 ## 2. Infrastructure & Adapter Polish
 
 Address technical debt in the core orchestration layer to improve stability for the 7-agent MENINX team.
 
-- [ ] **Standardize Adapter Utils:** Move `buildInvocationEnvForLogs` from the server shim to the `@paperclipai/adapter-utils` package (as noted in `server/src/adapters/utils.ts`).
-- [ ] **Improve Import TUI:** Implement adapter selection during company import (as noted in `cli/src/commands/client/company.ts`). This is critical when importing specialized agents (like NotebookLM) that shouldn't default to `claude_local`.
-- [ ] **Enable Worktree UI:** Re-activate the worktree support UI in `ui/src/adapters/runtime-json-fields.tsx` to better manage concurrent agent work on the same repository.
+- [x] **Standardize Adapter Utils:** Moved `buildInvocationEnvForLogs` from the server shim to direct re-export from `@paperclipai/adapter-utils` (MEN-2, committed).
+- [x] **Improve Import TUI:** Implemented adapter selection during company import (`cli/src/commands/client/company.ts`). Users can now choose claude-local, codex-local, gemini-local, opencode-local, cursor, http, or process for imported agents that lack an explicit adapter type.
+- [x] **Enable Worktree UI:** Re-activated the worktree support UI in `ui/src/adapters/runtime-json-fields.tsx` — `SHOW_EXPERIMENTAL_ISSUE_WORKTREE_UI` set to `true`.
 
 ## 3. Specialized Agent Coordination (MENINX Core)
 
 MENINX relies on a specific team structure (Claude, Jules, Gemini, Codex, Pentagi, LightRAG, NotebookLM). Coordination between research and engineering is currently manual via comments.
 
 - [ ] **Knowledge Handoff (LightRAG/NotebookLM):** Implement a "Shared Context" or "Knowledge Artifact" entity that allows Research agents to post structured data that Engineering agents can ingest directly without parsing long comment threads.
-- [ ] **Skill Re-activation:** Re-enable the "skills" tab in `AgentDetail.tsx` to allow easier runtime management of agent capabilities as the team grows.
-- [ ] **Automated Peer Review:** Configure `Pentagi` (Security) to automatically trigger a "security check" run when `Codex` (Engineer) moves an issue to `in_review`.
+- [x] **Skill Re-activation:** Re-enabled the Skills breadcrumb in `AgentDetail.tsx` (the tab was already visible; breadcrumb was incorrectly commented out).
+- [ ] **Automated Peer Review:** Configure `Pentagi` (Security) to automatically trigger a "security check" run when `Codex` (Engineer) moves an issue to `in_review`. Blocked: Pentagi HTTP endpoint not yet deployed.
 
 ## 4. Operational Performance
 
@@ -33,8 +33,9 @@ MENINX relies on a specific team structure (Claude, Jules, Gemini, Codex, Pentag
 
 ## 5. UI/UX for "Zero-Human" Monitoring
 
-- [ ] **Compact Inbox Enhancements:** Improve the `inbox-lite` API to include more metadata about why a task was woken up (reason, mentioned comment snippet), reducing the number of round-trips an agent (like Gemini) needs to make.
-- [ ] **Org-Chart Interactivity:** Enhance the org chart to show real-time "active heartbeats" so the human board can see exactly which agents are currently "alive" and working.
+- [x] **Compact Inbox Enhancements:** Added `wakeReason` field (`triggerDetail ?? invocationSource`) to `GET /agents/me/inbox-lite` response. Agents now know WHY they were woken up without a follow-up round-trip.
+- [x] **Org-Chart Interactivity:** Added 5-second polling (`refetchInterval: 5000`) to the agents query in `OrgChart.tsx`. Running agents show a pulsing status dot (`animate-pulse`) so the board can see active heartbeats in real-time.
 
 ---
 *Generated by EMP-002 Gemini (Research Analyst) for MENINX Agency LLC.*
+*Updated by EMP-000 Claude — implementation tracking as of 2026-04-13.*
