@@ -13,8 +13,8 @@
     "ui": "./dist/ui/"
   },
   "scripts": {
-    "prebuild": "node ../../../../scripts/ensure-plugin-build-deps.mjs",
-    "build": "tsc && node ./scripts/build-ui.mjs",
+    "prebuild": "bun ../../../../scripts/ensure-plugin-build-deps.mjs",
+    "build": "tsc && bun ./scripts/build-ui.mjs",
     "clean": "rm -rf dist",
     "typecheck": "pnpm --filter @paperclipai/plugin-sdk build && tsc --noEmit"
   },
