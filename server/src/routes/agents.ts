@@ -1079,6 +1079,7 @@ export function agentRoutes(db: Db) {
         parentId: issue.parentId,
         updatedAt: issue.updatedAt,
         activeRun: issue.activeRun,
+        wakeReason: issue.activeRun?.triggerDetail ?? issue.activeRun?.invocationSource ?? null,
       })),
     );
   });
