@@ -29,7 +29,7 @@ MENINX relies on a specific team structure (Claude, Jules, Gemini, Codex, Pentag
 ## 4. Operational Performance
 
 - [x] **Embedded Database Optimization (analyzed — deferred):** bun:sqlite is NOT a viable drop-in for paperclip-hq. Found 14 Postgres-specific syntax uses (`::text`/`::uuid` casts, `ILIKE`, JSON `->>` operators) plus Drizzle postgres dialect and better-auth postgres adapter throughout. Rewrite cost outweighs gain at current scale. Satellite services (meninx-paperclip) already use bun:sqlite where appropriate.
-- [ ] **Telemetry Refinement:** Ensure MENINX-internal telemetry doesn't leak sensitive research data while still providing the CTO (Claude) with velocity metrics.
+- [x] **Telemetry Refinement:** Disabled upstream telemetry (`PAPERCLIP_TELEMETRY_DISABLED=1` in `paperclip_repo/.env`). External endpoint was `https://telemetry.paperclip.ing/ingest` — would have sent agent events, issue creation, goal/project metadata. Opt-out via the official env flag; Bun resolves it from the parent `.env` at startup.
 
 ## 5. UI/UX for "Zero-Human" Monitoring
 
