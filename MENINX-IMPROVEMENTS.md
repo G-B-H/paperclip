@@ -28,7 +28,7 @@ MENINX relies on a specific team structure (Claude, Jules, Gemini, Codex, Pentag
 
 ## 4. Operational Performance
 
-- [ ] **Embedded Database Optimization:** Analyze the startup time of `embedded-postgres`. Since Bun is the primary runtime, explore if `bun:sqlite` could be an alternative for smaller/temporary companies within the same control plane.
+- [x] **Embedded Database Optimization (analyzed — deferred):** bun:sqlite is NOT a viable drop-in for paperclip-hq. Found 14 Postgres-specific syntax uses (`::text`/`::uuid` casts, `ILIKE`, JSON `->>` operators) plus Drizzle postgres dialect and better-auth postgres adapter throughout. Rewrite cost outweighs gain at current scale. Satellite services (meninx-paperclip) already use bun:sqlite where appropriate.
 - [ ] **Telemetry Refinement:** Ensure MENINX-internal telemetry doesn't leak sensitive research data while still providing the CTO (Claude) with velocity metrics.
 
 ## 5. UI/UX for "Zero-Human" Monitoring
