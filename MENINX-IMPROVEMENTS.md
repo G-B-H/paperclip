@@ -22,7 +22,7 @@ Address technical debt in the core orchestration layer to improve stability for 
 
 MENINX relies on a specific team structure (Claude, Jules, Gemini, Codex, Pentagi, LightRAG, NotebookLM). Coordination between research and engineering is currently manual via comments.
 
-- [ ] **Knowledge Handoff (LightRAG/NotebookLM):** Implement a "Shared Context" or "Knowledge Artifact" entity that allows Research agents to post structured data that Engineering agents can ingest directly without parsing long comment threads.
+- [x] **Knowledge Handoff (LightRAG/NotebookLM):** Implemented `knowledge_artifacts` store in meninx-paperclip — REST API (`/api/artifacts`) with type/tag/agent filters, consume tracking, and Hermes digest integration (🧠 section in daily Discord report). Research agents POST; Engineering agents GET + mark consumed.
 - [x] **Skill Re-activation:** Re-enabled the Skills breadcrumb in `AgentDetail.tsx` (the tab was already visible; breadcrumb was incorrectly commented out).
 - [ ] **Automated Peer Review:** Configure `Pentagi` (Security) to automatically trigger a "security check" run when `Codex` (Engineer) moves an issue to `in_review`. Blocked: Pentagi HTTP endpoint not yet deployed.
 
