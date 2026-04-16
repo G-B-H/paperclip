@@ -90,8 +90,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GHASSEN_PAT }}
         run: |
+          # Skip if PR already open for this branch
+          EXISTING=$(gh pr list --repo G-B-H/paperclip --head "${{ steps.branch.outputs.branch }}" --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [[ -n "$EXISTING" ]]; then
+            echo "PR #$EXISTING already open for ${{ steps.branch.outputs.branch }} — skipping creation"
+            echo "pr_url=https://github.com/G-B-H/paperclip/pull/$EXISTING" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           UPSTREAM_LOG=$(git log HEAD~${{ steps.diff.outputs.new_commits }}..upstream/master --oneline 2>/dev/null | head -20)
           PR_URL=$(gh pr create \
+            --repo G-B-H/paperclip \
             --base master \
             --head "${{ steps.branch.outputs.branch }}" \
             --title "upstream: sync paperclipai/paperclip → ${{ steps.diff.outputs.upstream_tag }}" \
@@ -132,6 +140,7 @@ jobs:
           git add -A && git commit -m "chore(upstream): sync attempt — CONFLICTS need resolution" || true
           git push origin "${{ steps.branch.outputs.branch }}" --force || true
           PR_URL=$(gh pr create \
+            --repo G-B-H/paperclip \
             --base master \
             --head "${{ steps.branch.outputs.branch }}" \
             --title "upstream: CONFLICTS — sync paperclipai/paperclip → ${{ steps.diff.outputs.upstream_tag }}" \
