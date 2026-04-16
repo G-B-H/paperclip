@@ -88,7 +88,7 @@ jobs:
         if: env.MERGE_CONFLICT != 'true'
         id: pr
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GHASSEN_PAT }}
         run: |
           UPSTREAM_LOG=$(git log HEAD~${{ steps.diff.outputs.new_commits }}..upstream/master --oneline 2>/dev/null | head -20)
           PR_URL=$(gh pr create \
@@ -126,7 +126,7 @@ jobs:
         if: env.MERGE_CONFLICT == 'true'
         id: pr_conflict
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GHASSEN_PAT }}
         run: |
           # Push branch with conflict markers for manual resolution
           git add -A && git commit -m "chore(upstream): sync attempt — CONFLICTS need resolution" || true
