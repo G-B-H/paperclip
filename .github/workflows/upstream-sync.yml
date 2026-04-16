@@ -41,10 +41,10 @@ jobs:
       - name: Check for new upstream commits
         id: diff
         run: |
-          # Count commits in upstream/main not yet in our master
-          NEW=$(git rev-list HEAD..upstream/main --count 2>/dev/null || echo "0")
-          UPSTREAM_SHA=$(git rev-parse upstream/main)
-          UPSTREAM_TAG=$(git describe --tags upstream/main 2>/dev/null || echo "untagged")
+          # Count commits in upstream/master not yet in our master
+          NEW=$(git rev-list HEAD..upstream/master --count 2>/dev/null || echo "0")
+          UPSTREAM_SHA=$(git rev-parse upstream/master)
+          UPSTREAM_TAG=$(git describe --tags upstream/master 2>/dev/null || echo "untagged")
           echo "new_commits=$NEW" >> "$GITHUB_OUTPUT"
           echo "upstream_sha=${UPSTREAM_SHA:0:7}" >> "$GITHUB_OUTPUT"
           echo "upstream_tag=$UPSTREAM_TAG" >> "$GITHUB_OUTPUT"
@@ -69,7 +69,7 @@ jobs:
       - name: Merge upstream into sync branch
         id: merge
         run: |
-          git merge upstream/main \
+          git merge upstream/master \
             --no-edit \
             -m "chore(upstream): merge paperclipai/paperclip@${{ steps.diff.outputs.upstream_sha }}
 
@@ -90,7 +90,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          UPSTREAM_LOG=$(git log HEAD~${{ steps.diff.outputs.new_commits }}..upstream/main --oneline 2>/dev/null | head -20)
+          UPSTREAM_LOG=$(git log HEAD~${{ steps.diff.outputs.new_commits }}..upstream/master --oneline 2>/dev/null | head -20)
           PR_URL=$(gh pr create \
             --base master \
             --head "${{ steps.branch.outputs.branch }}" \
