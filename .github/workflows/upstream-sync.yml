@@ -82,7 +82,7 @@ jobs:
 
       - name: Push sync branch
         if: env.MERGE_CONFLICT != 'true'
-        run: git push origin "${{ steps.branch.outputs.branch }}"
+        run: git push origin "${{ steps.branch.outputs.branch }}" --force
 
       - name: Create Pull Request (clean merge)
         if: env.MERGE_CONFLICT != 'true'
@@ -130,7 +130,7 @@ jobs:
         run: |
           # Push branch with conflict markers for manual resolution
           git add -A && git commit -m "chore(upstream): sync attempt — CONFLICTS need resolution" || true
-          git push origin "${{ steps.branch.outputs.branch }}" || true
+          git push origin "${{ steps.branch.outputs.branch }}" --force || true
           PR_URL=$(gh pr create \
             --base master \
             --head "${{ steps.branch.outputs.branch }}" \
