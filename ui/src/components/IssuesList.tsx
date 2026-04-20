@@ -1,5 +1,6 @@
 import { startTransition, useDeferredValue, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { accessApi } from "../api/access";
 import { useDialog } from "../context/DialogContext";
 import { useCompany } from "../context/CompanyContext";
 import { executionWorkspacesApi } from "../api/execution-workspaces";
@@ -12,6 +13,7 @@ import {
   shouldBlurPageSearchOnEscape,
 } from "../lib/keyboardShortcuts";
 import { formatAssigneeUserLabel } from "../lib/assignees";
+import { buildCompanyUserLabelMap, buildCompanyUserProfileMap } from "../lib/company-members";
 import { groupBy } from "../lib/groupBy";
 import {
   applyIssueFilters,
@@ -19,6 +21,7 @@ import {
   defaultIssueFilterState,
   issueFilterLabel,
   issuePriorityOrder,
+  normalizeIssueFilterState,
   resolveIssueFilterWorkspaceId,
   issueStatusOrder,
   type IssueFilterState,
@@ -86,7 +89,10 @@ const defaultViewState: IssueViewState = {
 function getViewState(key: string): IssueViewState {
   try {
     const raw = localStorage.getItem(key);
-    if (raw) return { ...defaultViewState, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return { ...defaultViewState, ...parsed, ...normalizeIssueFilterState(parsed) };
+    }
   } catch { /* ignore */ }
   return { ...defaultViewState };
 }
@@ -160,6 +166,13 @@ interface Agent {
   id: string;
   name: string;
 }
+
+type CreatorOption = {
+  id: string;
+  label: string;
+  kind: "agent" | "user";
+  searchText?: string;
+};
 
 type ProjectOption = Pick<Project, "id" | "name"> & Partial<Pick<Project, "color" | "workspaces" | "executionWorkspacePolicy" | "primaryWorkspace">>;
 type IssueListRequestFilters = NonNullable<Parameters<typeof issuesApi.list>[1]>;
@@ -271,6 +284,11 @@ export function IssuesList({
     queryKey: queryKeys.auth.session,
     queryFn: () => authApi.getSession(),
   });
+  const { data: companyMembers } = useQuery({
+    queryKey: queryKeys.access.companyUserDirectory(selectedCompanyId!),
+    queryFn: () => accessApi.listUserDirectory(selectedCompanyId!),
+    enabled: !!selectedCompanyId,
+  });
   const { data: experimentalSettings } = useQuery({
     queryKey: queryKeys.instance.experimentalSettings,
     queryFn: () => instanceSettingsApi.getExperimental(),
@@ -365,6 +383,15 @@ export function IssuesList({
     return agents.find((a) => a.id === id)?.name ?? null;
   }, [agents]);
 
+  const companyUserLabelMap = useMemo(
+    () => buildCompanyUserLabelMap(companyMembers?.users),
+    [companyMembers?.users],
+  );
+  const companyUserProfileMap = useMemo(
+    () => buildCompanyUserProfileMap(companyMembers?.users),
+    [companyMembers?.users],
+  );
+
   const projectById = useMemo(() => {
     const map = new Map<string, { name: string; color: string | null }>();
     for (const project of projects ?? []) {
@@ -431,6 +458,66 @@ export function IssuesList({
       .sort((a, b) => a[1].localeCompare(b[1]))
       .map(([id, name]) => ({ id, name }));
   }, [workspaceNameMap]);
+
+  const creatorOptions = useMemo<CreatorOption[]>(() => {
+    const options = new Map<string, CreatorOption>();
+    const knownAgentIds = new Set<string>();
+
+    if (currentUserId) {
+      options.set(`user:${currentUserId}`, {
+        id: `user:${currentUserId}`,
+        label: currentUserId === "local-board" ? "Board" : "Me",
+        kind: "user",
+        searchText: currentUserId === "local-board" ? "board me human local-board" : `me board human ${currentUserId}`,
+      });
+    }
+
+    for (const issue of issues) {
+      if (issue.createdByUserId) {
+        const id = `user:${issue.createdByUserId}`;
+        if (!options.has(id)) {
+          options.set(id, {
+            id,
+            label: formatAssigneeUserLabel(issue.createdByUserId, currentUserId) ?? issue.createdByUserId.slice(0, 5),
+            kind: "user",
+            searchText: `${issue.createdByUserId} board user human`,
+          });
+        }
+      }
+    }
+
+    for (const agent of agents ?? []) {
+      knownAgentIds.add(agent.id);
+      const id = `agent:${agent.id}`;
+      if (!options.has(id)) {
+        options.set(id, {
+          id,
+          label: agent.name,
+          kind: "agent",
+          searchText: `${agent.name} ${agent.id} agent`,
+        });
+      }
+    }
+
+    for (const issue of issues) {
+      if (issue.createdByAgentId && !knownAgentIds.has(issue.createdByAgentId)) {
+        const id = `agent:${issue.createdByAgentId}`;
+        if (!options.has(id)) {
+          options.set(id, {
+            id,
+            label: issue.createdByAgentId.slice(0, 8),
+            kind: "agent",
+            searchText: `${issue.createdByAgentId} agent`,
+          });
+        }
+      }
+    }
+
+    return [...options.values()].sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === "user" ? -1 : 1;
+      return a.label.localeCompare(b.label);
+    });
+  }, [agents, currentUserId, issues]);
 
   const visibleIssueColumnSet = useMemo(() => new Set(visibleIssueColumns), [visibleIssueColumns]);
   const availableIssueColumns = useMemo(
@@ -530,11 +617,11 @@ export function IssuesList({
         key === "__unassigned"
           ? "Unassigned"
           : key.startsWith("__user:")
-            ? (formatAssigneeUserLabel(key.slice("__user:".length), currentUserId) ?? "User")
+            ? (formatAssigneeUserLabel(key.slice("__user:".length), currentUserId, companyUserLabelMap) ?? "User")
             : (agentName(key) ?? key.slice(0, 8)),
       items: groups[key]!,
     }));
-  }, [filtered, viewState.groupBy, agents, agentName, currentUserId, workspaceNameMap, issueTitleMap]);
+  }, [filtered, viewState.groupBy, agents, agentName, currentUserId, workspaceNameMap, issueTitleMap, companyUserLabelMap]);
 
   useEffect(() => {
     if (viewState.viewMode !== "list") return;
@@ -671,6 +758,7 @@ export function IssuesList({
             onChange={updateView}
             activeFilterCount={activeFilterCount}
             agents={agents}
+            creators={creatorOptions}
             projects={projects?.map((project) => ({ id: project.id, name: project.name }))}
             labels={labels?.map((label) => ({ id: label.id, name: label.name, color: label.color }))}
             currentUserId={currentUserId}
@@ -838,6 +926,14 @@ export function IssuesList({
                   const useDeferredRowRendering = !(hasChildren && isExpanded);
                   const issueProject = issue.projectId ? projectById.get(issue.projectId) ?? null : null;
                   const parentIssue = issue.parentId ? issueById.get(issue.parentId) ?? null : null;
+                  const assigneeUserProfile = issue.assigneeUserId
+                    ? companyUserProfileMap.get(issue.assigneeUserId) ?? null
+                    : null;
+                  const assigneeUserLabel = formatAssigneeUserLabel(
+                    issue.assigneeUserId,
+                    currentUserId,
+                    companyUserLabelMap,
+                  ) ?? assigneeUserProfile?.label ?? null;
                   const toggleCollapse = (e: { preventDefault: () => void; stopPropagation: () => void }) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -922,6 +1018,8 @@ export function IssuesList({
                               })}
                               onFilterWorkspace={filterToWorkspace}
                               assigneeName={agentName(issue.assigneeAgentId)}
+                              assigneeUserName={assigneeUserLabel}
+                              assigneeUserAvatarUrl={assigneeUserProfile?.image ?? null}
                               currentUserId={currentUserId}
                               parentIdentifier={parentIssue?.identifier ?? null}
                               parentTitle={parentIssue?.title ?? null}
@@ -935,18 +1033,18 @@ export function IssuesList({
                                 >
                                   <PopoverTrigger asChild>
                                     <button
-                                      className="flex w-[180px] shrink-0 items-center rounded-md px-2 py-1 transition-colors hover:bg-accent/50"
+                                      className="flex w-full shrink-0 items-center overflow-hidden rounded-md px-2 py-1 transition-colors hover:bg-accent/50"
                                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
                                     >
                                       {issue.assigneeAgentId && agentName(issue.assigneeAgentId) ? (
-                                        <Identity name={agentName(issue.assigneeAgentId)!} size="sm" />
+                                        <Identity name={agentName(issue.assigneeAgentId)!} size="sm" className="min-w-0" />
                                       ) : issue.assigneeUserId ? (
-                                        <span className="inline-flex items-center gap-1.5 text-xs">
-                                          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-dashed border-muted-foreground/35 bg-muted/30">
-                                            <User className="h-3.5 w-3.5" />
-                                          </span>
-                                          {formatAssigneeUserLabel(issue.assigneeUserId, currentUserId) ?? "User"}
-                                        </span>
+                                        <Identity
+                                          name={assigneeUserLabel ?? "User"}
+                                          avatarUrl={assigneeUserProfile?.image ?? null}
+                                          size="sm"
+                                          className="min-w-0"
+                                        />
                                       ) : (
                                         <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                                           <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-dashed border-muted-foreground/35 bg-muted/30">

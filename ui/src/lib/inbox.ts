@@ -9,6 +9,7 @@ import type {
 import {
   applyIssueFilters,
   defaultIssueFilterState,
+  normalizeIssueFilterState,
   type IssueFilterState,
 } from "./issue-filters";
 
@@ -137,25 +138,6 @@ const defaultInboxFilterPreferences: InboxFilterPreferences = {
   issueFilters: defaultIssueFilterState,
 };
 
-function normalizeStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((entry): entry is string => typeof entry === "string");
-}
-
-function normalizeIssueFilterState(value: unknown): IssueFilterState {
-  if (!value || typeof value !== "object") return { ...defaultIssueFilterState };
-  const candidate = value as Partial<Record<keyof IssueFilterState, unknown>>;
-  return {
-    statuses: normalizeStringArray(candidate.statuses),
-    priorities: normalizeStringArray(candidate.priorities),
-    assignees: normalizeStringArray(candidate.assignees),
-    labels: normalizeStringArray(candidate.labels),
-    projects: normalizeStringArray(candidate.projects),
-    workspaces: normalizeStringArray(candidate.workspaces),
-    hideRoutineExecutions: candidate.hideRoutineExecutions === true,
-  };
-}
-
 function normalizeInboxCategoryFilter(value: unknown): InboxCategoryFilter {
   return value === "issues_i_touched"
     || value === "join_requests"
@@ -244,7 +226,7 @@ export function loadCollapsedInboxGroupKeys(
     const raw = localStorage.getItem(storageKey);
     if (!raw) return new Set();
     const parsed = JSON.parse(raw);
-    return new Set(normalizeStringArray(parsed));
+    return new Set(Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : []);
   } catch {
     return new Set();
   }
@@ -643,6 +625,10 @@ export function isMineInboxTab(tab: InboxTab): boolean {
   return tab === "mine";
 }
 
+export function shouldShowCompanyAlerts(tab: InboxTab): boolean {
+  return tab === "all";
+}
+
 export function resolveInboxSelectionIndex(
   previousIndex: number,
   itemCount: number,
@@ -713,12 +699,20 @@ export function getApprovalsForTab(
   approvals: Approval[],
   tab: InboxTab,
   filter: InboxApprovalFilter,
+  currentUserId?: string | null,
 ): Approval[] {
   const sortedApprovals = [...approvals].sort(
     (a, b) => normalizeTimestamp(b.updatedAt) - normalizeTimestamp(a.updatedAt),
   );
 
-  if (tab === "mine" || tab === "recent") return sortedApprovals;
+  if (tab === "mine") {
+    if (!currentUserId) return [];
+    return sortedApprovals.filter(
+      (approval) =>
+        approval.requestedByUserId === currentUserId || approval.decidedByUserId === currentUserId,
+    );
+  }
+  if (tab === "recent") return sortedApprovals;
   if (tab === "unread") {
     return sortedApprovals.filter((approval) => ACTIONABLE_APPROVAL_STATUSES.has(approval.status));
   }
@@ -1023,6 +1017,7 @@ export function computeInboxBadgeData({
   mineIssues,
   dismissedAlerts,
   dismissedAtByKey,
+  currentUserId,
 }: {
   approvals: Approval[];
   joinRequests: JoinRequest[];
@@ -1031,9 +1026,12 @@ export function computeInboxBadgeData({
   mineIssues: Issue[];
   dismissedAlerts: Set<string>;
   dismissedAtByKey: ReadonlyMap<string, number>;
+  currentUserId?: string | null;
 }): InboxBadgeData {
   const actionableApprovals = approvals.filter(
     (approval) =>
+      !!currentUserId &&
+      (approval.requestedByUserId === currentUserId || approval.decidedByUserId === currentUserId) &&
       ACTIONABLE_APPROVAL_STATUSES.has(approval.status) &&
       !isInboxEntityDismissed(dismissedAtByKey, `approval:${approval.id}`, approval.updatedAt),
   ).length;
@@ -1058,7 +1056,8 @@ export function computeInboxBadgeData({
   const alerts = Number(showAggregateAgentError) + Number(showBudgetAlert);
 
   return {
-    inbox: actionableApprovals + visibleJoinRequests + failedRuns + visibleMineIssues + alerts,
+    // The inbox badge reflects personal/actionable work, not company-wide health alerts.
+    inbox: actionableApprovals + visibleJoinRequests + failedRuns + visibleMineIssues,
     approvals: actionableApprovals,
     failedRuns,
     joinRequests: visibleJoinRequests,
