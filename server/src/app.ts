@@ -125,6 +125,7 @@ export async function createApp(
   },
 ) {
   const app = express();
+  app.disable('x-powered-by'); // F-004: suppress Express fingerprint disclosure
 
   app.use(express.json({
     // Company import/export payloads can inline full portable packages.
